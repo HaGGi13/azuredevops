@@ -31,9 +31,12 @@ node_modules
 
 .taskkey
 
-# Dep check data directory files
-src/Tasks/dependency-check-build-task/dependency-check/*
-src/Tasks/dependency-check-build-task/dependency-check/data/*
-src/Tasks/dependency-check-build-task/dependency-check-build-task.js
-!src/Tasks/dependency-check-build-task/dependency-check/data
-!src/Tasks/dependency-check-build-task/dependency-check/data/README.md
+# Dependency Check data files
+src/Tasks/*/dependency-check/*
+src/Tasks/*/dependency-check/data/*
+!src/Tasks/*/dependency-check/data
+!src/Tasks/*/dependency-check/data/README.md
+
+# build artifacts
+src/Tasks/*/dependency-check-build-task.js
+src/Tasks/*/dependency-check-data-task.js

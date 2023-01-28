@@ -17,6 +17,10 @@
       {
         "id": "dependency-check-build-task-dev",
         "behavior": " AlwaysInclude"
+      },
+      {
+        "id": "dependency-check-build-data-dev",
+        "behavior": " AlwaysInclude"
       }
     ]
   },
@@ -106,6 +110,16 @@
       "type": "ms.vss-distributed-task.task",
       "properties": {
         "name": "Tasks/dependency-check-build-task"
+      }
+    },
+    {
+      "id": "dependency-check-data-task-dev",
+      "targets": [
+        "ms.vss-distributed-task.tasks"
+      ],
+      "type": "ms.vss-distributed-task.task",
+      "properties": {
+        "name": "Tasks/dependency-check-data-task"
       }
     }
   ]
