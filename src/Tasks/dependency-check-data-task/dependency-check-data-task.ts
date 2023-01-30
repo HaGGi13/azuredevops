@@ -10,7 +10,18 @@ const client = new httpClient.HttpClient('DC_AGENT');
 const releaseApi = 'https://api.github.com/repos/jeremylong/DependencyCheck/releases';
 const dependencyCheckVersionLatest:string = 'latest';
 
+/*
+ * NOTE:
+ * 
+ * Azure DevOps Server/Services defines all not set input path as Build.SourcesDirectory.
+ * 
+ * Therefore, tl.getPathInput('localInstallPath') == tl.getVariable('Build.SourcesDirectory'), 
+ * if localInstallPath was not defined.
+ */
 
+/**
+ * The execution entry point.
+ */
 async function run() {
 
     console.log("Starting Dependency Check download...")
@@ -29,25 +40,27 @@ async function run() {
             throw new Error(`Invalid Dependency Check version format '${dependencyCheckVersion}'.`);
         }
 
-        // Set local installation path
+        // if localInstallPath is not set, it's sources directory path by default
         if (localInstallPath == sourcesDirectory) {
-            
-            localInstallPath = tl.resolve('./dependency-check');
-
-            tl.checkPath(localInstallPath, 'Dependency Check installer');
+            // set to '$(Build.SourcesDirectory)/dependency-check'
+            localInstallPath = tl.resolve('.', 'dependency-check');
+            // create directory, if not exist already
+            tl.mkdirP(localInstallPath);
             
             let installZipUrl: string;
             if (customRepoUrl) {
                 console.log(`Downloading Dependency Check installer from ${customRepoUrl}...`);
                 installZipUrl = customRepoUrl;
-            }
-            else {
+            } else {
                 console.log(`Downloading Dependency Check ${dependencyCheckVersion} installer from GitHub...`);
                 installZipUrl = await getDependencyCheckDownloadUrl(dependencyCheckVersion);
             }
 
             cleanDirectory(localInstallPath, ['**', '!data', '!data/**']);
             await unzipFromUrl(installZipUrl, tl.resolve('./'));
+        } else if (localInstallPath) {
+            // local installation path was defined, so it must exist
+            tl.checkPath(localInstallPath, "Dependency Check installer");
         }
     }
     catch (err: any) {
@@ -57,7 +70,6 @@ async function run() {
 
     console.log("Ending Dependency Check download...")
 }
-
 
 /**
  * Validates if a version has a valid format. Valid is 'x.y.z' or 'latest'.
@@ -74,7 +86,7 @@ function isVersionFormatValid(version: string): boolean {
 }
 
 /**
- * Returns the download URL of the OWASP Dependency Check installation package in defined version.
+  * Returns the download URL of the OWASP Dependency Check installation package in defined version.
  * @param {string} version The package version to download
  * @returns The package download URL.
  */
