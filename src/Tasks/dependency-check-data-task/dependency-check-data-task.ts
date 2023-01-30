@@ -60,15 +60,17 @@ async function run() {
 
 
 /**
- * Deletes all files and folders out of a specified root path recursively, based on defined patterns.
- * Performs the find and then applies the glob patterns. Supports interleaved exclude patterns.
- * @param {string} path The directory to clean up.
- * @param {string | string[]} patterns The search patterns to apply.
+ * Validates if a version has a valid format. Valid is 'x.y.z' or 'latest'.
+ * @param {string} version The version string to validate.
+ * @returns true if valid; otherwise false
  */
-function cleanDirectory(path: string, patterns:string|string[]) {
+function isVersionFormatValid(version: string): boolean {
 
-    let files = tl.findMatch(path, patterns);
-    files.forEach(file => tl.rmRF(file));
+    const versionPattern: string = `^(\d\.\d\.\d|${dependencyCheckVersionLatest})$`;
+
+    const versionRegex = new RegExp(versionPattern, 'gi');
+
+    return versionRegex.test(version);
 }
 
 /**
@@ -95,6 +97,37 @@ async function getDependencyCheckDownloadUrl(version: string): Promise<string> {
     logDebug(`Determined GitHub package URL: ${packageUrl}`);
 
     return packageUrl;
+}
+
+
+/**
+ * Deletes all files and folders out of a specified root path recursively, based on defined patterns.
+ * Performs the find and then applies the glob patterns. Supports interleaved exclude patterns.
+ * @param {string} path The directory to clean up.
+ * @param {string | string[]} patterns The search patterns to apply.
+ */
+function cleanDirectory(path: string, patterns:string|string[]) {
+
+    let files = tl.findMatch(path, patterns);
+    files.forEach(file => tl.rmRF(file));
+}
+
+/**
+ * Downloads a ZIP file from an URL and extracts it into a specified path.
+ * @param {string} zipUrl The URL to download the ZIP file from.
+ * @param {string} unzipLocation The path to extract the ZIP file to.
+ */
+async function unzipFromUrl(zipUrl: string, unzipLocation: string): Promise<void> {
+
+    let installZipPath: string = await downloadPackage(zipUrl);
+
+    await unzipFileTo(installZipPath, unzipLocation);
+
+    await logDebug('Unzipping complete, removing ZIP file now...');
+
+    tl.rmRF(installZipPath);
+
+    await logDebug('ZIP file has been removed');
 }
 
 /**
@@ -146,24 +179,6 @@ async function downloadPackage(url: string): Promise<string> {
 }
 
 /**
- * Downloads a ZIP file from an URL and extracts it into a specified path.
- * @param {string} zipUrl The URL to download the ZIP file from.
- * @param {string} unzipLocation The path to extract the ZIP file to.
- */
-async function unzipFromUrl(zipUrl: string, unzipLocation: string): Promise<void> {
-
-    let installZipPath: string = await downloadPackage(zipUrl);
-
-    await unzipFileTo(installZipPath, unzipLocation);
-
-    await logDebug('Unzipping complete, removing ZIP file now...');
-
-    tl.rmRF(installZipPath);
-
-    await logDebug('ZIP file has been removed');
-}
-
-/**
  * Unzips a file into a target path.
  * @param {string} filePath The path of the zip file to extract.
  * @param {string} targetPath The target path to unzip the zip file to.
@@ -204,19 +219,6 @@ function isSystemDebugEnabled(): boolean {
         && varSystemDebug.toLowerCase() == 'true';
 }
 
-/**
- * Validates if a version has a valid format. Valid is 'x.y.z' or 'latest'.
- * @param {string} version The version string to validate.
- * @returns true if valid; otherwise false
- */
-function isVersionFormatValid(version: string): boolean {
-
-    const versionPattern: string = `^(\d\.\d\.\d|${dependencyCheckVersionLatest})$`;
-
-    const versionRegex = new RegExp(versionPattern, 'gi');
-
-    return versionRegex.test(version);
-}
 
 
 run();
