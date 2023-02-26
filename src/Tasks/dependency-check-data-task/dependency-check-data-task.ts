@@ -359,9 +359,9 @@ async function runDependencyCheck(scriptPath: string, args: string): Promise<num
 /**
  * Executes the update phase of Dependency Check only,
  * no scan will be executed and no report will be generated. If enabled a log file is written.
- * @param {string} dependencyCheckDir 
- * @param {boolean} hasLocalInstallation 
- * @param {DependencyCheckOptions} dcOptions 
+ * @param {string} dependencyCheckDir Dependency Check directory path.
+ * @param {boolean} hasLocalInstallation Defines if Dependency Check is installed locally on agent.
+ * @param {DependencyCheckOptions} dcOptions The execution options for the Dependency Check.
  */
 async function updateDependencyCheckData(dependencyCheckDir: string, hasLocalInstallation: boolean, dcOptions: DependencyCheckOptions) {
 
