@@ -5,10 +5,13 @@ import path = require("path");
 import Zip from "adm-zip";
 import { IHttpClientResponse } from 'typed-rest-client/Interfaces';
 
+import { DCConst } from './dependency-check-constants';
+import { DependencyCheckOptions } from './dependency-check-options';
+import { DependencyCheckOptionsBuilder } from './dependency-check-options-builder';
+
+
 const client = new httpClient.HttpClient('DC_AGENT');
 
-const releaseApi = 'https://api.github.com/repos/jeremylong/DependencyCheck/releases';
-const dependencyCheckVersionLatest:string = 'latest';
 
 /*
  * NOTE:
@@ -19,6 +22,8 @@ const dependencyCheckVersionLatest:string = 'latest';
  * if localInstallPath was not defined.
  */
 
+
+
 /**
  * The execution entry point.
  */
@@ -28,13 +33,52 @@ async function run() {
 
     try {
         // Input parameters
-        const dependencyCheckVersion: string | undefined = (tl.getInput('dependencyCheckVersion') || dependencyCheckVersionLatest)?.trim();
-        let localInstallPath: string | undefined = tl.getPathInput('localInstallPath')?.trim();
         const customRepoUrl: string | undefined = tl.getInput('customRepoUrl')?.trim();
+        const dependencyCheckVersion: string | undefined = (tl.getInput('dependencyCheckVersion') || DCConst.DependencyCheckVersionLatest)?.trim();
+        const enableVerbose: boolean = tl.getBoolInput("enableVerbose");
+        let localInstallPath: string | undefined = tl.getPathInput('localInstallPath')?.trim();
+        let logDirectory: string | undefined = tl.getPathInput("logDirectory")?.trim();
+        let exportDirectory: string | undefined = tl.getPathInput("exportDirectory")?.trim();
 
         // Environment variable
-        let sourcesDirectory = tl.getVariable('Build.SourcesDirectory');
+        const sourcesDirectory: string | undefined = tl.getVariable("Build.SourcesDirectory");
+        const artifactDirectory: string | undefined = tl.getVariable("Build.ArtifactStagingDirectory");
+        
+        let hasLocalInstallation: boolean = true;
 
+
+
+        // Set log directory (if necessary)
+        if (logDirectory == sourcesDirectory) {
+            logDirectory = tl.resolve(artifactDirectory, DCConst.DependencyCheckFolderName);
+        }
+        console.log(`Setting log directory to ${logDirectory}`);
+        // Create log directory (if necessary)
+        if (!tl.exist(logDirectory!)) {
+            console.log(`Creating log directory at ${logDirectory}`);
+            tl.mkdirP(logDirectory!);
+        }
+
+        // Set export directory (if necessary)
+        if (exportDirectory == sourcesDirectory) {
+            exportDirectory = tl.resolve(artifactDirectory, DCConst.DependencyCheckFolderName);
+        }
+        console.log(`Setting export directory to ${exportDirectory}`);
+        // Create export directory (if necessary)
+        if (!tl.exist(exportDirectory!)) {
+            console.log(`Creating export directory at ${exportDirectory}`);
+            tl.mkdirP(exportDirectory!);
+        }
+
+        // Set logs file
+        let logFile = tl.resolve(logDirectory, 'dependency-check-log.txt');
+
+        var options = new DependencyCheckOptionsBuilder()
+            .setExportDirectory(exportDirectory)
+            .setIsUpdateOnlyEnabled(true)
+            .setIsVerboseEnabled(enableVerbose)
+            .setLogFilePath(logFile)
+            .build();
 
         if (!isVersionFormatValid(dependencyCheckVersion)) {
             throw new Error(`Invalid Dependency Check version format '${dependencyCheckVersion}'.`);
@@ -42,8 +86,9 @@ async function run() {
 
         // if localInstallPath is not set, it's sources directory path by default
         if (localInstallPath == sourcesDirectory) {
+            hasLocalInstallation = false;
             // set to '$(Build.SourcesDirectory)/dependency-check'
-            localInstallPath = tl.resolve('.', 'dependency-check');
+            localInstallPath = tl.resolve('.', DCConst.DependencyCheckFolderName);
             // create directory, if not exist already
             tl.mkdirP(localInstallPath);
             
@@ -58,6 +103,8 @@ async function run() {
 
             cleanDirectory(localInstallPath, ['**', '!data', '!data/**']);
             await unzipFromUrl(installZipUrl, tl.resolve('./'));
+
+            await updateDependencyCheckData(localInstallPath, hasLocalInstallation, options);
         } else if (localInstallPath) {
             // local installation path was defined, so it must exist
             tl.checkPath(localInstallPath, "Dependency Check installer");
@@ -74,11 +121,11 @@ async function run() {
 /**
  * Validates if a version has a valid format. Valid is 'x.y.z' or 'latest'.
  * @param {string} version The version string to validate.
- * @returns true if valid; otherwise false
+ * @returns {boolean} `true` if valid; otherwise `false`
  */
 function isVersionFormatValid(version: string): boolean {
 
-    const versionPattern: string = `^(\d\.\d\.\d|${dependencyCheckVersionLatest})$`;
+    const versionPattern: string = `^(\d\.\d\.\d|${DCConst.DependencyCheckVersionLatest})$`;
 
     const versionRegex = new RegExp(versionPattern, 'gi');
 
@@ -88,16 +135,16 @@ function isVersionFormatValid(version: string): boolean {
 /**
   * Returns the download URL of the OWASP Dependency Check installation package in defined version.
  * @param {string} version The package version to download
- * @returns The package download URL.
+ * @returns {string} The package download URL.
  */
 async function getDependencyCheckDownloadUrl(version: string): Promise<string> {
 
     logDebug('Determine GitHub package URL...')
 
-    let url = `${releaseApi}/tags/v${version}`;
+    let url = `${DCConst.DependencyCheckReleaseApi}/tags/v${version}`;
 
-    if (version.toLowerCase() == dependencyCheckVersionLatest) {
-        url = `${releaseApi}/${dependencyCheckVersionLatest}`;
+    if (version.toLowerCase() == DCConst.DependencyCheckVersionLatest) {
+        url = `${DCConst.DependencyCheckReleaseApi}/${DCConst.DependencyCheckVersionLatest}`;
     }
 
     let response = await client.get(url);
@@ -118,7 +165,7 @@ async function getDependencyCheckDownloadUrl(version: string): Promise<string> {
  * @param {string} path The directory to clean up.
  * @param {string | string[]} patterns The search patterns to apply.
  */
-function cleanDirectory(path: string, patterns:string|string[]) {
+function cleanDirectory(path: string, patterns: string|string[]) {
 
     let files = tl.findMatch(path, patterns);
     files.forEach(file => tl.rmRF(file));
@@ -221,7 +268,7 @@ function logDebug(message: string) {
 
 /**
  * Checks if the pipelines is executed in debug mode.
- * @returns {boolean} true if in debug mode; otherwise false
+ * @returns {boolean} `true` if in debug mode; otherwise `false`
  */
 function isSystemDebugEnabled(): boolean {
 
@@ -231,6 +278,114 @@ function isSystemDebugEnabled(): boolean {
         && varSystemDebug.toLowerCase() == 'true';
 }
 
+/**
+ * Determines the agent Operating System depending OWASP Dependency Check script full file path to execute.
+ * @param {string} dependencyCheckDir Dependency Check directory path.
+ * @returns {string} The OS specific script file path.
+ */
+async function getDependencyCheckScriptPath(dependencyCheckDir: string): Promise<string> {
+
+    // Get dependency check script path (.sh file for Linux and Darwin OS)
+    let osSpecificDependencyCheckScript = tl.getPlatform() == tl.Platform.Windows
+        ? 'dependency-check.bat'
+        : 'dependency-check.sh';
+
+    let dependencyCheckScriptPath = tl.resolve(dependencyCheckDir, 'bin', osSpecificDependencyCheckScript);
+
+    console.log(`Dependency Check script set to ${dependencyCheckScriptPath}`);
+
+    tl.checkPath(dependencyCheckScriptPath, 'Dependency Check script');
+
+    return dependencyCheckScriptPath;
+}
+
+/**
+ * Remove lock files from potential previous canceled run if no local/centralized installation of tool is used.
+ * We need this because due to a bug the dependency check tool is currently leaving `.lock` files around if you cancel at the wrong moment.
+ * Since a per-agent installation shouldn't be able to run two scans parallel, we can safely remove all lock files still lying around.
+ * @param {string} dependencyCheckDir Dependency Check directory path.
+ */
+function removeLockFile(dependencyCheckDir: string) {
+
+    console.log('Searching for left over lock files...');
+
+    let lockFiles = tl.findMatch(dependencyCheckDir, '*.lock', undefined, { matchBase: true });
+
+    if (lockFiles.length > 0) {
+
+        console.log('found ' + lockFiles.length + ' left over lock files, removing them now...');
+
+        lockFiles.forEach(lockfile => {
+            let fullLockFilePath = tl.resolve(lockfile);
+
+            try {
+                if (tl.exist(fullLockFilePath)) {
+                    console.log('removing lock file "' + fullLockFilePath + '"...');
+                    tl.rmRF(fullLockFilePath);
+                }
+                else {
+                    console.log('found lock file "' + fullLockFilePath + '" doesn\'t exist, that was unexpected');
+                }
+            }
+            catch (err) {
+                console.log('could not delete lock file "' + fullLockFilePath + '"!');
+                console.error(err);
+            }
+        });
+    }
+    else {
+        console.log('found no left over lock files, continuing...');
+    }
+}
+
+/**
+ * 
+ * @param {string} scriptPath OS specific Dependency Check script file path to execute.
+ * @param {string} args The arguments to pass to the to execute script.
+ * @returns {number} The Dependency Check exit code.
+ */
+async function runDependencyCheck(scriptPath: string, args: string): Promise<number> {
+
+    let exitCode = await tl.tool(scriptPath).line(args).exec({
+        failOnStdErr: false,
+        ignoreReturnCode: true
+    });
+
+    console.log(`Dependency Check completed with exit code ${exitCode}.`);
+
+    return exitCode;
+}
+
+/**
+ * Executes the update phase of Dependency Check only,
+ * no scan will be executed and no report will be generated. If enabled a log file is written.
+ * @param {string} dependencyCheckDir 
+ * @param {boolean} hasLocalInstallation 
+ * @param {DependencyCheckOptions} dcOptions 
+ */
+async function updateDependencyCheckData(dependencyCheckDir: string, hasLocalInstallation: boolean, dcOptions: DependencyCheckOptions) {
+
+    let dependencyCheckScriptPath: string = await getDependencyCheckScriptPath(dependencyCheckDir);
+
+    let args = dcOptions.getExecutableArguments();
+
+    // Console output for the log file
+    console.log('Invoking Dependency Check data update...');
+    console.log(`Path: ${dependencyCheckScriptPath}`);
+    console.log(`Arguments: ${args}`);
+
+    // Set Java args
+    tl.setVariable('JAVA_OPTS', '-Xss8192k');
+
+    // Version smoke test
+    await tl.tool(dependencyCheckScriptPath).arg(dcOptions.cliArguments.Version).exec();
+    
+    if (!hasLocalInstallation) {
+        removeLockFile(dependencyCheckDir);
+    }
+
+    let exitCode = await runDependencyCheck(dependencyCheckScriptPath, args);
+}
 
 
 run();

@@ -15,10 +15,10 @@
   },
   "inputs": [
     {
-      "name": "localInstallPath",
-      "type": "filePath",
-      "label": "Local Install Path",
-      "helpMarkDown": "The local path to the `dependency-check` installation directory (on-prem build agents only). Setting this field will run Dependency Check locally instead of downloading the installer onto the build agent.",
+      "name": "customRepoUrl",
+      "type": "string",
+      "label": "Custom Installer Repository URL",
+      "helpMarkDown": "By default, the build task downloads the installer from the Dependency Check GitHub releases. Entering a value for this field will pull the installer package from a custom endpoint.",
       "defaultValue": "",
       "required": false
     },
@@ -31,12 +31,36 @@
       "required": false
     },
     {
-      "name": "customRepoUrl",
-      "type": "string",
-      "label": "Custom Installer Repository URL",
-      "helpMarkDown": "By default, the build task downloads the installer from the Dependency Check GitHub releases. Entering a value for this field will pull the installer package from a custom endpoint.",
+      "name": "enableVerbose",
+      "type": "boolean",
+      "label": "Verbose",
+      "defaultValue": "false",
+      "required": false,
+      "helpMarkDown": "Enable verbose logging."
+    },
+    {
+      "name": "localInstallPath",
+      "type": "filePath",
+      "label": "Local Install Path",
+      "helpMarkDown": "The local path to the `dependency-check` installation directory (on-prem build agents only). Setting this field will run Dependency Check locally instead of downloading the installer onto the build agent.",
       "defaultValue": "",
       "required": false
+    },
+    {
+      "name": "logDirectory",
+      "type": "filePath",
+      "label": "Log Directory",
+      "defaultValue": "",
+      "required": false,
+      "helpMarkDown": "Log file output directory. On-prem build agents can specify a local directory to override the default location. The default location is the $BUILD_ARTIFACTSTAGINGDIRECTORY\\dependency-check directory."
+    },
+    {
+      "name": "exportDirectory",
+      "type": "filePath",
+      "label": "Export Directory",
+      "defaultValue": "",
+      "required": false,
+      "helpMarkDown": "Export directory in which the ZIP file will be stored. On-prem build agents can specify a local directory to override the default location. The default location is the $BUILD_ARTIFACTSTAGINGDIRECTORY\\dependency-check directory."
     }
   ],
   "instanceNameFormat": "Dependency Check Data Download",
